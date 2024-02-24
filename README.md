@@ -1,3 +1,3 @@
 # wp-install
 
-A bash script to quickly install a WordPress site in your Linux-based dev environment.
+A Bash script to quickly install a WordPress site in your Debian-based dev environment.
