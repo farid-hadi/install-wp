@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# wp-install
+# install-wp
 # Bash script that downloads and installs WordPress at the specified location, with the specified domain and database.
 
 # Text formatting
