@@ -41,6 +41,11 @@ if [ "$tar_cmd" == "" ]; then
 	abort 1 "Aborted. tar does not seem to be installed."
 fi
 
+find_cmd=$(which find)
+if [ "$find_cmd" == "" ]; then
+	abort 1 "Aborted. find does not seem to be installed."
+fi
+
 # Read arguments passed with command
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -96,28 +101,36 @@ fi
 # Get users home directory
 user_home=$(getent passwd $SUDO_USER | cut -d: -f6)
 # Hidden tmp directory in install-wp/ in the user's home directory
-user_home_tmp="$user_home/install-wp/.tmp/"
+user_home_tmp="$user_home/install-wp/.tmp"
 
-# Download WordPress
-printf "Downloading WordPress...\n"
 if [ ! -d $user_home_tmp ]; then
 	$mkdir_cmd $user_home_tmp
 fi
 if [ ! $? -eq 0 ]; then
 	abort 1 "Aborted. Could not create temporary directory in home directory."
 fi
-$curl_cmd -L -o "$user_home_tmp/latest.tar.gz" https://wordpress.org/latest.tar.gz
-if [ ! $? -eq 0 ]; then
-	if [ -f "$user_home_tmp/latest.tar.gz" ]; then
-		rm "$user_home_tmp/latest.tar.gz"
-		rmdir "$document_root"
+
+# Check if we have a recent download of WordPress
+printf "Checking for cached WordPress archive...\n"
+if [ -f "$user_home_tmp/latest.tar.gz" ]; then
+	$find_cmd "$user_home_tmp" -name "latest.tar.gz" -type f -user root -mmin +360 -delete
+fi
+
+# Download WordPress if we don't have a recent download
+if [ ! -f "$user_home_tmp/latest.tar.gz" ]; then
+	printf "Downloading WordPress...\n"
+	$curl_cmd -L -o "$user_home_tmp/latest.tar.gz" https://wordpress.org/latest.tar.gz
+	if [ ! $? -eq 0 ]; then
+		if [ -f "$user_home_tmp/latest.tar.gz" ]; then
+			rm "$user_home_tmp/latest.tar.gz"
+		fi
+		abort 1 "Aborted. Could not download WordPress."
 	fi
-	abort 1 "Aborted. Could not download WordPress."
 fi
 
 # Extract WordPress tar file
 printf "Extracting files...\n"
-tar xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-components=1
+$tar_cmd xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-components=1
 
 # Empty .tmp directory in install-wp/ in the user's home directory
 #printf "Deleting temporary files...\n"
