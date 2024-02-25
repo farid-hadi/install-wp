@@ -87,7 +87,7 @@ printf "Creating document root...\n"
 if [ -d $document_root ]; then
 	abort 1 "Aborted. The doucment root already exists."
 else
-	$mkdir_cmd $document_root
+	$mkdir_cmd -p $document_root
 fi
 if [ ! $? -eq 0 ]; then
 	abort 1 "Aborted. Could not create document root."
@@ -108,6 +108,10 @@ if [ ! $? -eq 0 ]; then
 fi
 $curl_cmd -L -o "$user_home_tmp/latest.tar.gz" https://wordpress.org/latest.tar.gz
 if [ ! $? -eq 0 ]; then
+	if [ -f "$user_home_tmp/latest.tar.gz" ]; then
+		rm "$user_home_tmp/latest.tar.gz"
+		rmdir "$document_root"
+	fi
 	abort 1 "Aborted. Could not download WordPress."
 fi
 
