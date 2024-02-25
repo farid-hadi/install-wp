@@ -111,6 +111,10 @@ if [ ! $? -eq 0 ]; then
 	abort 1 "Aborted. Could not download WordPress."
 fi
 
+# Extract WordPress tar file
+printf "Extracting files...\n"
+tar xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-components=1
+
 # Empty .tmp directory in install-wp/ in the user's home directory
 #printf "Deleting temporary files...\n"
 #/usr/bin/rm -r $user_home_tmp
