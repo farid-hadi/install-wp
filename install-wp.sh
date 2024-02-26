@@ -6,11 +6,48 @@
 
 version="0.0.1-alpha"
 
-# Print version if prompted
-while getopts ":v" opt; do
+# Print version function
+function printVersion() {
+	printf "install-wp version: $version\n"
+}
+
+# Print help text function
+function printHelp() {
+	printVersion
+	printf "\n"
+	printf "Quickly install a new WordPress site in your development environment.\n"
+	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database with values extracted from the install-wp-[admin|site]-opts files, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.\n"
+	printf "\n"
+	printf "Prior to running this script you need to create the below two 'MySQL Options files' with '[client] sections' in your home directory. "
+	printf "You can copy the files install-wp/config/install-wp-admin-opts-template and install-wp/config/install-wp-site-opts-template to create your option files.\n"
+	printf "\n"
+	printf "IMPORTANT: Make sure you restrict access to your option files with e.g. chmod 600 so that others can't see your database passwords!\n"
+	printf "\n"
+	printf "MySQL Option Files:\n"
+	printf "~/install-wp/config/install-wp-admin-opts\n"
+	printf "  Needs to contain username and password for the database user that can create new databases and grants.\n"
+	printf "~/install-wp/config/install-wp-site-opts\n"
+	printf "  Needs to contain username, password and database name for the new database and user to create for this site.\n"
+	printf "\n"
+	printf "Usage: install-wp [options]\n"
+	printf "\n"
+	printf "If you don't pass any options the script will prompt you for the required data.\n"
+	printf "\n"
+	printf "Options:\n"
+	printf "  -h, --help                    Display this help and exit.\n"
+	printf "  -v, --version                 Display version and exit.\n"
+	printf "  -d, --domain                  Set domain name of the site you're creating.\n"
+	printf "  -doc-root, --document-root    Set document root of the site you're creating. I.e. where to install the WordPress core files.\n"
+}
+
+# Print help or version if prompted
+while getopts ":vh" opt; do
 	case $opt in
 		v|version)
-			printf "install-wp version: $version\n"
+			printVersion
+			exit 0;;
+		h|help)
+			printHelp
 			exit 0;;
 	esac
 done
