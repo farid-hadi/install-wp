@@ -46,6 +46,23 @@ if [ "$find_cmd" == "" ]; then
 	abort 1 "Aborted. find does not seem to be installed."
 fi
 
+nginx_cmd=$(which nginx)
+if [ -z "$nginx_cmd" ]; then
+	abort 1 "Aborted. nginx does not seem to be installed."
+else
+	# Get nginx user
+	declare $(ps -eo "%u,%c,%a" | grep nginx | awk '
+	BEGIN { FS="," }
+	{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
+	{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
+	/worker process/ { print "nginx_user="$1; exit }
+	')
+
+	if [ -z "$nginx_user" ]; then
+		abort 1 "Aborted. Could not get nginx user."
+	fi
+fi
+
 # Read arguments passed with command
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -132,8 +149,9 @@ fi
 printf "Extracting files...\n"
 $tar_cmd xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-components=1
 
-# Empty .tmp directory in install-wp/ in the user's home directory
-#printf "Deleting temporary files...\n"
-#/usr/bin/rm -r $user_home_tmp
+# Set file permission for document root
+printf "Setting file permissions...\n"
+chown -R $nginx_user:$nginx_user "$document_root"
+chmod -R 770 "$document_root"
 
 printf "${green}All done!${cf}\n"
