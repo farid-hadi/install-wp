@@ -2,6 +2,18 @@
 
 # install-wp
 # Bash script that downloads and installs WordPress at the specified location, with the specified domain and database.
+# https://github.com/farid-hadi/install-wp
+
+version="0.0.1-alpha"
+
+# Print version if prompted
+while getopts ":v" opt; do
+	case $opt in
+		v|version)
+			printf "install-wp version: $version\n"
+			exit 0;;
+	esac
+done
 
 # Text formatting
 underline='\033[4m'
@@ -81,7 +93,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-# Prompt for missing arguments
+# Prompt for any missing required arguments
 if [ -z "$domain" ]; then
   read -p "Domain name: " domain
 fi
