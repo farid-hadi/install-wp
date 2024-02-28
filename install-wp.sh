@@ -203,4 +203,28 @@ printf "Setting file permissions...\n"
 chown -R $nginx_user:$nginx_user "$document_root"
 chmod -R 770 "$document_root"
 
+# Read MySQL option files and get required information
+printf "Reading MySQL Option files...\n"
+mysql_admin_opts_file="$user_home/install-wp/config/install-wp-admin-opts.cnf"
+mysql_site_opts_file="$user_home/install-wp/config/install-wp-site-opts.cnf"
+
+if [ ! -f $mysql_admin_opts_file ]; then
+	abort 1 "Aborted. Could not find file install-wp/config/install-wp-admin-opts.cnf in home directory."
+else
+	# Check file permissions to ensure user doesn't have insecure options file
+	file_permissions=$(stat -c %a $mysql_admin_opts_file)
+	if [ ! $file_permissions -eq 600 ] && [ ! $file_permissions -eq 400 ]; then
+		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-admin-opts.cnf in home directory."
+	fi
+fi
+if [ ! -f $mysql_site_opts_file ]; then
+  abort 1 "Aborted. Could not find file install-wp/config/install-wp-site-opts.cnf in home directory."
+else
+	# Check file permissions to ensure user doesn't have insecure options file
+	file_permissions=$(stat -c %a $mysql_site_opts_file)
+	if [ ! $file_permissions -eq 600 ] && [ ! $file_permissions -eq 400 ]; then
+		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-site-opts.cnf in home directory."
+	fi
+fi
+
 printf "${green}All done!${cf}\n"
