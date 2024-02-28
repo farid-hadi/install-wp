@@ -1,0 +1,5 @@
+# MySQL Options File template for the admin database user
+# Caution: Make sure to restrict access to your MySQL Options files (with e.g. chmod 600) so that unauthorized users can't see your passwords!
+[client]
+user=username # Replace 'username' with a user that has permissions to create databases and add grants
+password=user_password # Replace 'user_password' with the above user's password

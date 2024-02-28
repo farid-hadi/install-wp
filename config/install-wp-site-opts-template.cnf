@@ -1,0 +1,6 @@
+# MySQL Options File template for the site's database user
+# Caution: Make sure to restrict access to your MySQL Options files (with e.g. chmod 600) so that unauthorized users can't see your passwords!
+[client]
+user=username # Replace 'username' with a user name you wish to create for the WordPress site
+password=user_password # Replace 'user_password' with a password you wish to use for the above user
+database=database_name # Replace 'database_name' with the database name you wish to use when the database for the WordPress site is created
