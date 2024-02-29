@@ -203,11 +203,6 @@ fi
 printf "Extracting files...\n"
 $tar_cmd xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-components=1
 
-# Set file permission for document root
-printf "Setting file permissions...\n"
-chown -R $nginx_user:$nginx_user "$document_root"
-chmod -R 770 "$document_root"
-
 # Read MySQL option files and get required information
 printf "Reading MySQL Option files...\n"
 mysql_admin_opts_file="$user_home/install-wp/config/install-wp-admin-opts.cnf"
@@ -235,9 +230,9 @@ fi
 # Extract data from MySQL option file
 declare $(awk '
 BEGIN { FS="=|#" }
-$1 == "user" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_user="$2; next }
-$1 == "password" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_password="$2; next }
-$1 == "database" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_name="$2; next }
+$1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_user="$2; next }
+$1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_password="$2; next }
+$1 == "database" { gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_name="$2; next }
 ' "$mysql_site_opts_file" )
 
 # Check that we have all the required database information
@@ -255,26 +250,46 @@ fi
 printf "Creating database...\n"
 $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "USE $database_name;" &> /dev/null;
 if [ $? -eq 0 ]; then
-  abort 1 "Aborted. Database already exists."
+	abort 1 "Aborted. Database already exists."
 fi
 
 $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE DATABASE $database_name;" 1> /dev/null;
 if [ $? -ne 0 ]; then
-  abort 1 "Aborted. Could not create database."
+	abort 1 "Aborted. Could not create database."
 fi
 
 $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE USER IF NOT EXISTS '$database_user'@'localhost' IDENTIFIED BY '$database_password';" 1> /dev/null;
 if [ $? -ne 0 ]; then
-  # Since we couldn't create the user, let's delete the database we created
-  $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
-  abort 1 "Aborted. Could not create database user."
+	# Since we couldn't create the user, let's delete the database we created
+	$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
+	abort 1 "Aborted. Could not create database user."
 fi
 
 $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "GRANT ALL ON $database_name.* TO '$database_user'@'localhost';" 1> /dev/null;
 if [ $? -ne 0 ]; then
-  # Since we couldn't set the grants, let's delete the database we created
-  $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
-  abort 1 "Aborted. Could not set grants for database user."
+	# Since we couldn't set the grants, let's delete the database we created
+	$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
+	abort 1 "Aborted. Could not set grants for database user."
 fi
+
+# Create wp-config.php with database information from MySQL option file for site
+printf "Creating wp-config.php...\n"
+awk '
+BEGIN{ OFS = "\047" }
+FNR == NR && $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); user = $2; next }
+FNR == NR && $1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); password = $2; next }
+FNR == NR && $1 == "database" { gsub(/^[ \t]+|[ \t]+$/, "", $2); database = $2; next }
+FNR != NR && /^define\(/ && /DB_NAME/ { $4 = database }
+FNR != NR && /^define\(/ && /DB_USER/ { $4 = user }
+FNR != NR && /^define\(/ && /DB_PASSWORD/ { $4 = password }
+FNR != NR' FS="=|#" "$mysql_site_opts_file" FS="\047" "$document_root/wp-config-sample.php" > "$document_root/wp-config.php"
+if [ $? -ne 0 ]; then
+	abort 1 "Aborted. Could not create wp-config.php file."
+fi
+
+# Set file permission for document root
+printf "Setting file permissions...\n"
+chown -R $nginx_user:$nginx_user "$document_root"
+chmod -R 770 "$document_root"
 
 printf "${green}All done!${cf}\n"
