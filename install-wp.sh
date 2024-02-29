@@ -61,7 +61,7 @@ cf='\033[0m' # Clear formatting
 # Function: Output message and exit with exit code
 # Params: $1 = exit code, $2 = message
 function abort() {
-	if [ ! $1 -eq 0 ]; then
+	if [ $1 -ne 0 ]; then
 		printf "${red}$2${cf}\n"
 	else
 		printf "$2\n"
@@ -70,28 +70,28 @@ function abort() {
 }
 
 # Require root privileges
-if [[ $EUID -ne 0 ]]; then
+if [ $EUID -ne 0 ]; then
 	abort 1 "Error: This script must be run as root."
 fi
 
 # Check that the commands we need are installed and store their absolute paths in variables
 mkdir_cmd=$(which mkdir)
-if [ "$mkdir_cmd" == "" ]; then
+if [ -z "$mkdir_cmd" ]; then
 	abort 1 "Aborted. mkdir does not seem to be installed."
 fi
 
 curl_cmd=$(which curl)
-if [ "$curl_cmd" == "" ]; then
+if [ -z "$curl_cmd" ]; then
 	abort 1 "Aborted. CURL does not seem to be installed."
 fi
 
 tar_cmd=$(which tar)
-if [ "$tar_cmd" == "" ]; then
+if [ -z "$tar_cmd" ]; then
 	abort 1 "Aborted. tar does not seem to be installed."
 fi
 
 find_cmd=$(which find)
-if [ "$find_cmd" == "" ]; then
+if [ -z "$find_cmd" ]; then
 	abort 1 "Aborted. find does not seem to be installed."
 fi
 
@@ -110,6 +110,11 @@ else
 	if [ -z "$nginx_user" ]; then
 		abort 1 "Aborted. Could not get nginx user."
 	fi
+fi
+
+mysql_cmd=$(which mysql)
+if [ -z "$mysql_cmd" ]; then
+	abort 1 "Aborted. MySQL/MariaDB does not seem to be installed."
 fi
 
 # Read arguments passed with command
@@ -160,7 +165,7 @@ if [ -d $document_root ]; then
 else
 	$mkdir_cmd -p $document_root
 fi
-if [ ! $? -eq 0 ]; then
+if [ $? -ne 0 ]; then
 	abort 1 "Aborted. Could not create document root."
 fi
 
@@ -172,7 +177,7 @@ user_home_tmp="$user_home/install-wp/.tmp"
 if [ ! -d $user_home_tmp ]; then
 	$mkdir_cmd $user_home_tmp
 fi
-if [ ! $? -eq 0 ]; then
+if [ $? -ne 0 ]; then
 	abort 1 "Aborted. Could not create temporary directory in home directory."
 fi
 
@@ -186,7 +191,7 @@ fi
 if [ ! -f "$user_home_tmp/latest.tar.gz" ]; then
 	printf "Downloading WordPress...\n"
 	$curl_cmd -L -o "$user_home_tmp/latest.tar.gz" https://wordpress.org/latest.tar.gz
-	if [ ! $? -eq 0 ]; then
+	if [ $? -ne 0 ]; then
 		if [ -f "$user_home_tmp/latest.tar.gz" ]; then
 			rm "$user_home_tmp/latest.tar.gz"
 		fi
@@ -194,7 +199,7 @@ if [ ! -f "$user_home_tmp/latest.tar.gz" ]; then
 	fi
 fi
 
-# Extract WordPress tar file
+# Extract WordPress tar file and place WordPress core in document root
 printf "Extracting files...\n"
 $tar_cmd xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-components=1
 
@@ -213,7 +218,7 @@ if [ ! -f $mysql_admin_opts_file ]; then
 else
 	# Check file permissions to ensure user doesn't have insecure options file
 	file_permissions=$(stat -c %a $mysql_admin_opts_file)
-	if [ ! $file_permissions -eq 600 ] && [ ! $file_permissions -eq 400 ]; then
+	if [ $file_permissions -ne 600 ] && [ $file_permissions -ne 400 ]; then
 		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-admin-opts.cnf in home directory."
 	fi
 fi
@@ -222,9 +227,54 @@ if [ ! -f $mysql_site_opts_file ]; then
 else
 	# Check file permissions to ensure user doesn't have insecure options file
 	file_permissions=$(stat -c %a $mysql_site_opts_file)
-	if [ ! $file_permissions -eq 600 ] && [ ! $file_permissions -eq 400 ]; then
+	if [ $file_permissions -ne 600 ] && [ $file_permissions -ne 400 ]; then
 		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-site-opts.cnf in home directory."
 	fi
+fi
+
+# Extract data from MySQL option file
+declare $(awk '
+BEGIN { FS="=|#" }
+$1 == "user" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_user="$2; next }
+$1 == "password" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_password="$2; next }
+$1 == "database" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_name="$2; next }
+' "$mysql_site_opts_file" )
+
+# Check that we have all the required database information
+if [ -z "$database_user" ]; then
+	abort 1 "Aborted. Could not extract database user from MySQL options file."
+fi
+if [ -z "$database_password" ]; then
+	abort 1 "Aborted. Could not extract database password MySQL options file."
+fi
+if [ -z "$database_name" ]; then
+	abort 1 "Aborted. Could not extract database name from MySQL options file."
+fi
+
+# Create database and database user
+printf "Creating database...\n"
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "USE $database_name;" &> /dev/null;
+if [ $? -eq 0 ]; then
+  abort 1 "Aborted. Database already exists."
+fi
+
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE DATABASE $database_name;" 1> /dev/null;
+if [ $? -ne 0 ]; then
+  abort 1 "Aborted. Could not create database."
+fi
+
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE USER IF NOT EXISTS '$database_user'@'localhost' IDENTIFIED BY '$database_password';" 1> /dev/null;
+if [ $? -ne 0 ]; then
+  # Since we couldn't create the user, let's delete the database we created
+  $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
+  abort 1 "Aborted. Could not create database user."
+fi
+
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "GRANT ALL ON $database_name.* TO '$database_user'@'localhost';" 1> /dev/null;
+if [ $? -ne 0 ]; then
+  # Since we couldn't set the grants, let's delete the database we created
+  $mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
+  abort 1 "Aborted. Could not set grants for database user."
 fi
 
 printf "${green}All done!${cf}\n"
