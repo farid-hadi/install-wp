@@ -37,19 +37,33 @@ function printHelp() {
 	printf "  -h, --help                    Display this help and exit.\n"
 	printf "  -v, --version                 Display version and exit.\n"
 	printf "  -d, --domain                  Set domain name of the site you're creating.\n"
-	printf "  -doc-root, --document-root    Set document root of the site you're creating. I.e. where to install the WordPress core files.\n"
+	printf "  -docroot, --document-root    Set document root of the site you're creating. I.e. where to install the WordPress core files.\n"
 }
 
-# Print help or version if prompted
-while getopts ":vh" opt; do
-	case $opt in
-		v|version)
+# Read arguments passed with command
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-v|--version)
 			printVersion
-			exit 0;;
-		h|help)
+			exit 0
+			;;
+		-h|--help)
 			printHelp
-			exit 0;;
+			exit 0
+			;;
+		-d|--domain)
+			domain="$2"
+			;;
+		-docroot|--document-root)
+			document_root="$2"
+			;;
+		*)
+			printf "${red}Error: Invalid arguments.${cf}\n"
+			printf "Use --help for help with usage.\n"
+			exit 1
 	esac
+	shift
+	shift
 done
 
 # Text formatting
@@ -74,6 +88,20 @@ if [ $EUID -ne 0 ]; then
 	abort 1 "Error: This script must be run as root."
 fi
 
+# Prompt for any missing arguments
+if [ -z "$domain" ]; then
+	read -p "Domain name (optional): " domain
+fi
+
+if [ -z "$document_root" ]; then
+	read -e -p "Document root (where to place WordPress files): " document_root
+fi
+
+# Abort if any required arguments are missing
+if [ -z "$document_root" ]; then
+	abort 1 "Aborted. No document root supplied as argument."
+fi
+
 # Check that the commands we need are installed and store their absolute paths in variables
 mkdir_cmd=$(which mkdir)
 if [ -z "$mkdir_cmd" ]; then
@@ -95,53 +123,28 @@ if [ -z "$find_cmd" ]; then
 	abort 1 "Aborted. find does not seem to be installed."
 fi
 
-nginx_cmd=$(which nginx)
-if [ -z "$nginx_cmd" ]; then
-	abort 1 "Aborted. nginx does not seem to be installed."
-else
-	# Get nginx user
-	declare $(ps -eo "%u,%c,%a" | grep nginx | awk '
-	BEGIN { FS="," }
-	{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
-	{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
-	/worker process/ { print "nginx_user="$1; exit }
-	')
+if [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
+	nginx_cmd=$(which nginx)
+	if [ -z "$nginx_cmd" ]; then
+		abort 1 "Aborted. nginx does not seem to be installed."
+	else
+		# Get nginx user
+		declare $(ps -eo "%u,%c,%a" | grep nginx | awk '
+		BEGIN { FS="," }
+		{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
+		{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
+		/worker process/ { print "nginx_user="$1; exit }
+		')
 
-	if [ -z "$nginx_user" ]; then
-		abort 1 "Aborted. Could not get nginx user."
+		if [ -z "$nginx_user" ]; then
+			abort 1 "Aborted. Could not get nginx user."
+		fi
 	fi
 fi
 
 mysql_cmd=$(which mysql)
 if [ -z "$mysql_cmd" ]; then
 	abort 1 "Aborted. MySQL/MariaDB does not seem to be installed."
-fi
-
-# Read arguments passed with command
-while [ $# -gt 0 ]; do
-	case "$1" in
-		-d|-domain|--domain)
-			domain="$2"
-			;;
-		-doc-root|-document-root|--document-root)
-			document_root="$2"
-			;;
-		*)
-			printf "${red}Error: Invalid arguments.${cf}\n"
-			printf "Valid arguments are: -d or -domain for domain name. -doc-root or -document-root for location to install WordPress files.\n"
-			exit 1
-	esac
-	shift
-	shift
-done
-
-# Prompt for any missing required arguments
-if [ -z "$domain" ]; then
-  read -p "Domain name: " domain
-fi
-
-if [ -z "$document_root" ]; then
-  read -p "Document root (where to place WordPress files): " document_root
 fi
 
 # Ask for verfication before beginning install
@@ -153,7 +156,7 @@ printf "Continue? [yes/No]: "
 read continue
 
 if [ -z "$continue" ] || [ "$continue" != "yes" ]; then
-  abort 1 "Aborted. No site created."
+	abort 1 "Aborted. No site created."
 fi
 
 unset continue
@@ -291,5 +294,75 @@ fi
 printf "Setting file permissions...\n"
 chown -R $nginx_user:$nginx_user "$document_root"
 chmod -R 770 "$document_root"
+
+# Create Nginx server block for domain
+if [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
+	
+	if [ -n "$nginx_cmd" ]; then
+
+		printf "Creating Nginx server block...\n"
+		
+		if [ -d "/etc/nginx/sites-available" ] && [ -d "/etc/nginx/sites-enabled" ]; then
+			vhost_config_dir="/etc/nginx/sites-available"
+		elif [ -d "/etc/nginx/vhosts.d" ]; then
+			vhost_config_dir="/etc/nginx/vhosts.d"
+		elif [ -d "/etc/nginx/conf.d" ]; then
+			vhost_config_dir="/etc/nginx/conf.d"
+		fi
+
+		if [ -z "$vhost_config_dir" ]; then
+			abort 1 "Aborted. Could not find location for server block configuration."
+		fi
+
+		php_fpm_sock=$($find_cmd /var/run/php/ -name "php*-fpm.sock" -type s -print -quit)
+
+		if [ -z "$php_fpm_sock" ]; then
+			abort 1 "Aborted. Could not find PHP FPM socket."
+		fi
+
+		read -r -d '' server_block_template <<-"EOF"
+		# Created by install-wp
+		server {
+		  server_name DOMAIN;
+		  listen 80;
+		  listen [::]:80;
+		  root DOCROOT;
+		  index index.php index.html;
+
+		  location / {
+		    try_files $uri $uri/ /index.php$is_args$args;
+		  }
+
+		  location ~ \.php$ {
+		    fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+		    try_files $fastcgi_script_name =404;
+		    set $path_info $fastcgi_path_info;
+				include fastcgi_params;
+		    fastcgi_param PATH_INFO $path_info;
+		    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+		    fastcgi_index index.php;
+		    fastcgi_pass unix:PHPFPMSOCK;
+		  }
+		}
+		EOF
+
+		printf "$server_block_template" | awk -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
+		/^  server_name/ && $2 == "DOMAIN;" && /;$/ { $2 = domain";" }
+		/^  root/ && $2 == "DOCROOT;" && /;$/ { $2 = docroot";" }
+		/^    fastcgi_pass/ && $2 == "unix:PHPFPMSOCK;" && /;$/ { $2 = "unix:"php_fpm_sock";" } 1' > "$vhost_config_dir/$domain"
+		
+		if [ $? -ne 0 ]; then
+			abort 1 "Aborted. Could not create Nginx server block."
+		else
+			if [ "$vhost_config_dir" == "/etc/nginx/sites-available" ]; then
+				ln -s "$vhost_config_dir/$domain" /etc/nginx/sites-enabled
+			fi
+			printf "Reloading Nginx...\n"
+			$nginx_cmd -s reload
+		fi
+	
+	fi
+	
+fi
 
 printf "${green}All done!${cf}\n"
