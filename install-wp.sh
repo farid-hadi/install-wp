@@ -21,7 +21,7 @@ function printHelp() {
 	printf "Prior to running this script you need to create the below two 'MySQL Options files' with '[client] sections' in your home directory. "
 	printf "You can copy the files install-wp/config/install-wp-admin-opts-template and install-wp/config/install-wp-site-opts-template to create your option files.\n"
 	printf "\n"
-	printf "IMPORTANT: Make sure you restrict access to your option files with e.g. chmod 600 so that others can't see your database passwords!\n"
+	printf "IMPORTANT: Make sure you restrict access to your option files with e.g. chmod 600 so that unauthorized users can't see your database passwords!\n"
 	printf "\n"
 	printf "MySQL Option Files:\n"
 	printf "~/install-wp/config/install-wp-admin-opts\n"
@@ -37,7 +37,8 @@ function printHelp() {
 	printf "  -h, --help                    Display this help and exit.\n"
 	printf "  -v, --version                 Display version and exit.\n"
 	printf "  -d, --domain                  Set domain name of the site you're creating.\n"
-	printf "  -docroot, --document-root    Set document root of the site you're creating. I.e. where to install the WordPress core files.\n"
+	printf "  -docroot, --document-root     Set document root of the site you're creating. I.e. where to install the WordPress core files.\n"
+	printf "  --nginx                       Set your chosen web server to Nginx.\n"
 }
 
 # Read arguments passed with command
@@ -56,6 +57,11 @@ while [ $# -gt 0 ]; do
 			;;
 		-docroot|--document-root)
 			document_root="$2"
+			;;
+		--nginx)
+			web_server="nginx"
+			shift
+			continue
 			;;
 		*)
 			printf "${red}Error: Invalid arguments.${cf}\n"
@@ -97,9 +103,19 @@ if [ -z "$document_root" ]; then
 	read -e -p "Document root (where to place WordPress files): " document_root
 fi
 
+if [ -z "$web_server" ]; then
+	read -e -p "Web server (nginx): " web_server
+fi
+
 # Abort if any required arguments are missing
 if [ -z "$document_root" ]; then
 	abort 1 "Aborted. No document root supplied as argument."
+fi
+if [ -z "$web_server" ]; then
+	abort 1 "Aborted. No web server supplied as argument."
+fi
+if [ "$web_server" != "nginx" ]; then
+	abort 1 "Aborted. Invalid value supplied for web server."
 fi
 
 # Check that the commands we need are installed and store their absolute paths in variables
@@ -123,25 +139,6 @@ if [ -z "$find_cmd" ]; then
 	abort 1 "Aborted. find does not seem to be installed."
 fi
 
-if [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
-	nginx_cmd=$(which nginx)
-	if [ -z "$nginx_cmd" ]; then
-		abort 1 "Aborted. nginx does not seem to be installed."
-	else
-		# Get nginx user
-		declare $(ps -eo "%u,%c,%a" | grep nginx | awk '
-		BEGIN { FS="," }
-		{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
-		{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
-		/worker process/ { print "nginx_user="$1; exit }
-		')
-
-		if [ -z "$nginx_user" ]; then
-			abort 1 "Aborted. Could not get nginx user."
-		fi
-	fi
-fi
-
 mysql_cmd=$(which mysql)
 if [ -z "$mysql_cmd" ]; then
 	abort 1 "Aborted. MySQL/MariaDB does not seem to be installed."
@@ -151,6 +148,7 @@ fi
 printf "Install WordPress site with below details?\n"
 printf "Domain name: ${domain}\n"
 printf "Document root: ${document_root}\n"
+printf "Web server: ${web_server}\n"
 
 printf "Continue? [yes/No]: "
 read continue
@@ -160,6 +158,26 @@ if [ -z "$continue" ] || [ "$continue" != "yes" ]; then
 fi
 
 unset continue
+
+# If chosen web server is Nginx, get command and user
+if [ "$web_server" == "nginx" ] && [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
+	nginx_cmd=$(which nginx)
+	if [ -z "$nginx_cmd" ]; then
+		abort 1 "Aborted. nginx does not seem to be installed."
+	else
+		# Get nginx user
+		declare $(ps -eo "%u,%c,%a" | grep nginx | awk '
+		BEGIN { FS="," }
+		{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
+		{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
+		/worker process/ { print "web_server_user="$1; exit }
+		')
+
+		if [ -z "$web_server_user" ]; then
+			abort 1 "Aborted. Could not get nginx user."
+		fi
+	fi
+fi
 
 # Create the document root
 printf "Creating document root...\n"
@@ -292,75 +310,71 @@ fi
 
 # Set file permission for document root
 printf "Setting file permissions...\n"
-chown -R $nginx_user:$nginx_user "$document_root"
+chown -R $web_server_user:$web_server_user "$document_root"
 chmod -R 770 "$document_root"
 
 # Create Nginx server block for domain
-if [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
+if [ "$web_server" == "nginx" ] && [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
+
+	printf "Creating Nginx server block...\n"
 	
-	if [ -n "$nginx_cmd" ]; then
+	if [ -d "/etc/nginx/sites-available" ] && [ -d "/etc/nginx/sites-enabled" ]; then
+		vhost_config_dir="/etc/nginx/sites-available"
+	elif [ -d "/etc/nginx/vhosts.d" ]; then
+		vhost_config_dir="/etc/nginx/vhosts.d"
+	elif [ -d "/etc/nginx/conf.d" ]; then
+		vhost_config_dir="/etc/nginx/conf.d"
+	fi
 
-		printf "Creating Nginx server block...\n"
-		
-		if [ -d "/etc/nginx/sites-available" ] && [ -d "/etc/nginx/sites-enabled" ]; then
-			vhost_config_dir="/etc/nginx/sites-available"
-		elif [ -d "/etc/nginx/vhosts.d" ]; then
-			vhost_config_dir="/etc/nginx/vhosts.d"
-		elif [ -d "/etc/nginx/conf.d" ]; then
-			vhost_config_dir="/etc/nginx/conf.d"
-		fi
+	if [ -z "$vhost_config_dir" ]; then
+		abort 1 "Aborted. Could not find location for server block configuration."
+	fi
 
-		if [ -z "$vhost_config_dir" ]; then
-			abort 1 "Aborted. Could not find location for server block configuration."
-		fi
+	php_fpm_sock=$($find_cmd /var/run/php/ -name "php*-fpm.sock" -type s -print -quit)
 
-		php_fpm_sock=$($find_cmd /var/run/php/ -name "php*-fpm.sock" -type s -print -quit)
+	if [ -z "$php_fpm_sock" ]; then
+		abort 1 "Aborted. Could not find PHP FPM socket."
+	fi
 
-		if [ -z "$php_fpm_sock" ]; then
-			abort 1 "Aborted. Could not find PHP FPM socket."
-		fi
+	read -r -d '' server_block_template <<"EOF"
+# Created by install-wp
+server {
+	server_name DOMAIN;
+	listen 80;
+	listen [::]:80;
+	root DOCROOT;
+	index index.php index.html;
 
-		read -r -d '' server_block_template <<-"EOF"
-		# Created by install-wp
-		server {
-		  server_name DOMAIN;
-		  listen 80;
-		  listen [::]:80;
-		  root DOCROOT;
-		  index index.php index.html;
+	location / {
+		try_files $uri $uri/ /index.php$is_args$args;
+	}
 
-		  location / {
-		    try_files $uri $uri/ /index.php$is_args$args;
-		  }
+	location ~ \.php$ {
+		fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+		try_files $fastcgi_script_name =404;
+		set $path_info $fastcgi_path_info;
+		include fastcgi_params;
+		fastcgi_param PATH_INFO $path_info;
+		fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+		fastcgi_index index.php;
+		fastcgi_pass unix:PHPFPMSOCK;
+	}
+}
+EOF
 
-		  location ~ \.php$ {
-		    fastcgi_split_path_info ^(.+?\.php)(/.*)$;
-		    try_files $fastcgi_script_name =404;
-		    set $path_info $fastcgi_path_info;
-				include fastcgi_params;
-		    fastcgi_param PATH_INFO $path_info;
-		    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-		    fastcgi_index index.php;
-		    fastcgi_pass unix:PHPFPMSOCK;
-		  }
-		}
-		EOF
-
-		printf "$server_block_template" | awk -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
-		/^  server_name/ && $2 == "DOMAIN;" && /;$/ { $2 = domain";" }
-		/^  root/ && $2 == "DOCROOT;" && /;$/ { $2 = docroot";" }
-		/^    fastcgi_pass/ && $2 == "unix:PHPFPMSOCK;" && /;$/ { $2 = "unix:"php_fpm_sock";" } 1' > "$vhost_config_dir/$domain"
-		
-		if [ $? -ne 0 ]; then
-			abort 1 "Aborted. Could not create Nginx server block."
-		else
-			if [ "$vhost_config_dir" == "/etc/nginx/sites-available" ]; then
-				ln -s "$vhost_config_dir/$domain" /etc/nginx/sites-enabled
-			fi
-			printf "Reloading Nginx...\n"
-			$nginx_cmd -s reload
-		fi
+	printf "$server_block_template" | awk -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
+	/^\tserver_name/ && $2 == "DOMAIN;" && /;$/ { $2 = domain";"; print "\t"$0; next }
+	/^\troot/ && $2 == "DOCROOT;" && /;$/ { $2 = docroot";"; print "\t"$0; next }
+	/^\t\tfastcgi_pass/ && $2 == "unix:PHPFPMSOCK;" && /;$/ { $2 = "unix:"php_fpm_sock";"; print "\t\t"$0; next } 1' > "$vhost_config_dir/$domain"
 	
+	if [ $? -ne 0 ]; then
+		abort 1 "Aborted. Could not create Nginx server block."
+	else
+		if [ "$vhost_config_dir" == "/etc/nginx/sites-available" ]; then
+			ln -s "$vhost_config_dir/$domain" /etc/nginx/sites-enabled
+		fi
+		printf "Reloading Nginx...\n"
+		$nginx_cmd -s reload
 	fi
 	
 fi
