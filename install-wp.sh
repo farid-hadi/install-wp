@@ -160,7 +160,7 @@ fi
 unset continue
 
 # If chosen web server is Nginx, get command and user
-if [ "$web_server" == "nginx" ] && [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
+if [ "$web_server" == "nginx" ]; then
 	nginx_cmd=$(which nginx)
 	if [ -z "$nginx_cmd" ]; then
 		abort 1 "Aborted. nginx does not seem to be installed."
