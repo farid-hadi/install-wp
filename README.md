@@ -10,21 +10,23 @@ A bash script to quickly install a WordPress site in your Linux-based developmen
 
 ## Configuration
 
-**Before running the script the first time** you'll need to create two _MySQL Option files_ in your home directory.
+**Before running the script for the first time** you'll need to create two [_MySQL Option files_](https://dev.mysql.com/doc/refman/8.0/en/option-files.html#option-file-syntax) in your home directory.
 
 You can copy the files `install-wp/config/install-wp-admin-opts-template.cnf` and `install-wp/config/install-wp-site-opts-template.cnf` to create your option files.
 These files must be placed in `~/install-wp/config/` and must be named `install-wp-admin-opts.cnf` and `install-wp-site-opts.cnf` respectively.
 
 **Important:** Make sure your restrict access to these files so that unauthorized users can't see your database passwords!
 
-Copy the file MySQL option files and set the correct permissions
+Copy the MySQL option files and set the correct permissions:
 
 ```
-sudo cp ~/install-wp/config/install-wp-admin-opts-template.cnf ~/install-wp/config/install-wp-admin-opts.cnf
-sudo chmod 600 ~/install-wp/config/install-wp-admin-opts.cnf
-sudo cp ~/install-wp/config/install-wp-site-opts-template.cnf ~/install-wp/config/install-wp-site-opts.cnf
-sudo chmod 600 ~/install-wp/config/install-wp-site-opts.cnf
+cp ~/install-wp/config/install-wp-admin-opts-template.cnf ~/install-wp/config/install-wp-admin-opts.cnf
+chmod 600 ~/install-wp/config/install-wp-admin-opts.cnf
+cp ~/install-wp/config/install-wp-site-opts-template.cnf ~/install-wp/config/install-wp-site-opts.cnf
+chmod 600 ~/install-wp/config/install-wp-site-opts.cnf
 ```
+
+Next, use your preferred text editor and update the usernames, passwords and database name in your newly created files.
 
 `~/install-wp/config/install-wp-admin-opts.cnf` needs to contain a `[client]` section with a `user` and a `password`. This database user needs exist and needs to have the required privileges to be able to create databases, users and set grants.
 
@@ -36,7 +38,7 @@ user=username
 password=user_password
 ```
 
-`~/install-wp/config/install-wp-site-opts.cnf` needs to contain a `[client]` section with a `user`, a `password` and a `database`. This database user will be created for your by the script. These same values will also be entered into the created `wp-config.php` file.
+`~/install-wp/config/install-wp-site-opts.cnf` needs to contain a `[client]` section with a `user`, a `password` and a `database`. This database and user will be created for your by the script. These same values will also be entered into the created `wp-config.php` file.
 
 Example:
 
@@ -51,7 +53,7 @@ database=database_name
 
 **Note:** The script must be run with `sudo`.
 
-Example to install a new WordPress site with the domain your.domain.com, with a document root of /var/www/your.domain.com/public_html, served by an Nginx web server.
+Example to install a new WordPress site with the domain _your.domain.com_, with a document root of _/var/www/your.domain.com/public_html_, served by an _Nginx_ web server.
 
 ```
 cd ~/install-wp/
@@ -60,7 +62,7 @@ sudo ./install-wp.sh -d your.domain.com -docroot /var/www/your.domain.com/public
 
 After running the above, simple visit your.domain.com to run the usual WordPress installation.
 
-Example to install a new WordPress without creating a server block (virtual host), with a document root of /var/www/your.domain.com/public_html, served by an Nginx web server.
+Example to install a new WordPress _without creating a server block (virtual host)_, with a document root of _/var/www/your.domain.com/public_html_, served by an _Nginx_ web server.
 
 ```
 cd ~/install-wp/
