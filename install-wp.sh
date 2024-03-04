@@ -19,7 +19,7 @@ function printHelp() {
 	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database with values extracted from the install-wp-[admin|site]-opts files, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.\n"
 	printf "\n"
 	printf "Prior to running this script you need to create the below two 'MySQL Options files' with '[client] sections' in your home directory. "
-	printf "You can copy the files install-wp/config/install-wp-admin-opts-template and install-wp/config/install-wp-site-opts-template to create your option files.\n"
+	printf "You can copy the files install-wp/config/install-wp-admin-opts-template.cnf and install-wp/config/install-wp-site-opts-template.cnf to create your option files.\n"
 	printf "\n"
 	printf "IMPORTANT: Make sure you restrict access to your option files with e.g. chmod 600 so that unauthorized users can't see your database passwords!\n"
 	printf "\n"
