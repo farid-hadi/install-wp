@@ -60,7 +60,7 @@ cd ~/install-wp/
 sudo ./install-wp.sh -d your.domain.com -docroot /var/www/your.domain.com/public_html --nginx
 ```
 
-After running the above, simple visit your.domain.com to run the usual WordPress installation.
+After running the above, simply visit _your.domain.com_ to run the usual WordPress installation.
 
 Example to install a new WordPress _without creating a server block (virtual host)_, with a document root of _/var/www/your.domain.com/public_html_, served by an _Nginx_ web server.
 
