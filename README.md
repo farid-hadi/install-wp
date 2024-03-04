@@ -4,6 +4,10 @@ A bash script to quickly install a WordPress site in your Linux-based developmen
 
 `install-wp` will download WordPress from WordPress.org, extract the files to your desired document root, create the database and database user with values extracted from _MySQL Option files_, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.
 
+**Note:** install-wp currently only supports Nginx. Support for Apache will be coming.
+
+_install-wp is in no way affiliated with or endorsed by the WordPress Foundation or the WordPress open source project._
+
 ## Requirements
 
 `install-wp` requires a Linux-based environment with Nginx, MySQL or MariaDB and PHP(FPM) installed.
