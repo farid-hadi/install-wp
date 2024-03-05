@@ -12,27 +12,29 @@ _install-wp is in no way affiliated with or endorsed by the WordPress Foundation
 
 `install-wp` requires a Linux-based environment with Nginx, MySQL or MariaDB and PHP(FPM) installed.
 
+Other requirements are CURL, Tar and AWK, which likely already are installed on your system.
+
 ## Configuration
 
 **Before running the script for the first time** you'll need to create two [_MySQL Option files_](https://dev.mysql.com/doc/refman/8.0/en/option-files.html#option-file-syntax) in your home directory.
 
-You can copy the files `install-wp/config/install-wp-admin-opts-template.cnf` and `install-wp/config/install-wp-site-opts-template.cnf` to create your option files.
-These files must be placed in `~/install-wp/config/` and must be named `install-wp-admin-opts.cnf` and `install-wp-site-opts.cnf` respectively.
+You can copy the files `install-wp/conf/mysql-opts-admin-template.cnf` and `install-wp/conf/mysql-opts-site-template.cnf` to create your option files.
+These files must be placed in `~/install-wp/conf/` and must be named `mysql-opts-admin.cnf` and `mysql-opts-site.cnf` respectively.
 
 **Important:** Make sure your restrict access to these files so that unauthorized users can't see your database passwords!
 
 Copy the MySQL option files and set the correct permissions:
 
 ```
-cp ~/install-wp/config/install-wp-admin-opts-template.cnf ~/install-wp/config/install-wp-admin-opts.cnf
-chmod 600 ~/install-wp/config/install-wp-admin-opts.cnf
-cp ~/install-wp/config/install-wp-site-opts-template.cnf ~/install-wp/config/install-wp-site-opts.cnf
-chmod 600 ~/install-wp/config/install-wp-site-opts.cnf
+cp ~/install-wp/conf/mysql-opts-admin-template.cnf ~/install-wp/conf/mysql-opts-admin.cnf
+chmod 600 ~/install-wp/conf/mysql-opts-admin.cnf
+cp ~/install-wp/conf/mysql-opts-site-template.cnf ~/install-wp/conf/mysql-opts-site.cnf
+chmod 600 ~/install-wp/conf/mysql-opts-site.cnf
 ```
 
 Next, use your preferred text editor and update the usernames, passwords and database name in your newly created files.
 
-`~/install-wp/config/install-wp-admin-opts.cnf` needs to contain a `[client]` section with a `user` and a `password`. This database user needs exist and needs to have the required privileges to be able to create databases, users and set grants.
+`~/install-wp/conf/mysql-opts-admin.cnf` needs to contain a `[client]` section with a `user` and a `password`. This needs to be an existing database user with privileges required to create databases, users and set grants.
 
 Example:
 
@@ -42,7 +44,7 @@ user=username
 password=user_password
 ```
 
-`~/install-wp/config/install-wp-site-opts.cnf` needs to contain a `[client]` section with a `user`, a `password` and a `database`. This database and user will be created for your by the script. These same values will also be entered into the created `wp-config.php` file.
+`~/install-wp/conf/mysql-opts-site.cnf` needs to contain a `[client]` section with a `user`, a `password` and a `database`. This database and user will be created for your by the script. These same values will also be entered into the created `wp-config.php` file.
 
 Example:
 

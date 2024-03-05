@@ -4,7 +4,7 @@
 # Bash script that downloads and installs WordPress at the specified location, with the specified domain and database.
 # https://github.com/farid-hadi/install-wp
 
-version="0.1.0-alpha"
+version="0.2.0-alpha"
 
 # Print version function
 function printVersion() {
@@ -16,18 +16,18 @@ function printHelp() {
 	printVersion
 	printf "\n"
 	printf "Quickly install a new WordPress site in your development environment.\n"
-	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database with values extracted from the install-wp-[admin|site]-opts files, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.\n"
+	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database and database user with values extracted from the MySQL Option files, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.\n"
 	printf "\n"
 	printf "Prior to running this script you need to create the below two 'MySQL Option files' with '[client] sections' in your home directory. "
-	printf "You can copy the files install-wp/config/install-wp-admin-opts-template.cnf and install-wp/config/install-wp-site-opts-template.cnf to create your option files.\n"
+	printf "You can copy the files install-wp/conf/mysql-opts-admin-template.cnf and install-wp/conf/mysql-opts-site-template.cnf to create your option files.\n"
 	printf "\n"
 	printf "IMPORTANT: Make sure you restrict access to your option files with e.g. chmod 600 so that unauthorized users can't see your database passwords!\n"
 	printf "\n"
 	printf "MySQL Option Files:\n"
-	printf "~/install-wp/config/install-wp-admin-opts\n"
-	printf "  Needs to contain username and password for the database user that can create new databases and grants.\n"
-	printf "~/install-wp/config/install-wp-site-opts\n"
-	printf "  Needs to contain username, password and database name for the new database and user to create for this site.\n"
+	printf "~/install-wp/conf/mysql-opts-admin.cnf\n"
+	printf "  Needs to contain username and password for an existing database user that can create new databases, users and grants.\n"
+	printf "~/install-wp/conf/mysql-opts-site.cnf\n"
+	printf "  Needs to contain username, password and database name for the new database and database user that you wish to be created for this site.\n"
 	printf "\n"
 	printf "Usage: install-wp [options]\n"
 	printf "\n"
@@ -39,6 +39,8 @@ function printHelp() {
 	printf "  -d, --domain                  Set domain name of the site you're creating.\n"
 	printf "  -docroot, --document-root     Set document root of the site you're creating. I.e. where to install the WordPress core files.\n"
 	printf "  --nginx                       Set your chosen web server to Nginx.\n"
+	printf "\n"
+	printf "Please also see documentation at https://github.com/farid-hadi/install-wp\n"
 }
 
 # Read arguments passed with command
@@ -134,6 +136,11 @@ if [ -z "$tar_cmd" ]; then
 	abort 1 "Aborted. tar does not seem to be installed."
 fi
 
+awk_cmd=$(which awk)
+if [ -z "$awk_cmd" ]; then
+	abort 1 "Aborted. AWK does not seem to be installed."
+fi
+
 find_cmd=$(which find)
 if [ -z "$find_cmd" ]; then
 	abort 1 "Aborted. find does not seem to be installed."
@@ -166,7 +173,7 @@ if [ "$web_server" == "nginx" ]; then
 		abort 1 "Aborted. nginx does not seem to be installed."
 	else
 		# Get nginx user
-		declare $(ps -eo "%u,%c,%a" | grep nginx | awk '
+		declare $(ps -eo "%u,%c,%a" | grep nginx | $awk_cmd '
 		BEGIN { FS="," }
 		{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
 		{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
@@ -226,30 +233,30 @@ $tar_cmd xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-componen
 
 # Read MySQL option files and get required information
 printf "Reading MySQL Option files...\n"
-mysql_admin_opts_file="$user_home/install-wp/config/install-wp-admin-opts.cnf"
-mysql_site_opts_file="$user_home/install-wp/config/install-wp-site-opts.cnf"
+mysql_admin_opts_file="$user_home/install-wp/conf/mysql-opts-admin.cnf"
+mysql_site_opts_file="$user_home/install-wp/conf/mysql-opts-site.cnf"
 
 if [ ! -f $mysql_admin_opts_file ]; then
-	abort 1 "Aborted. Could not find file install-wp/config/install-wp-admin-opts.cnf in home directory."
+	abort 1 "Aborted. Could not find file install-wp/conf/mysql-opts-admin.cnf in home directory."
 else
 	# Check file permissions to ensure user doesn't have insecure options file
 	file_permissions=$(stat -c %a $mysql_admin_opts_file)
 	if [ $file_permissions -ne 600 ] && [ $file_permissions -ne 400 ]; then
-		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-admin-opts.cnf in home directory."
+		abort 1 "Aborted. Insecure file permissons on file install-wp/conf/mysql-opts-admin.cnf in home directory."
 	fi
 fi
 if [ ! -f $mysql_site_opts_file ]; then
-  abort 1 "Aborted. Could not find file install-wp/config/install-wp-site-opts.cnf in home directory."
+  abort 1 "Aborted. Could not find file install-wp/conf/mysql-opts-site.cnf in home directory."
 else
 	# Check file permissions to ensure user doesn't have insecure options file
 	file_permissions=$(stat -c %a $mysql_site_opts_file)
 	if [ $file_permissions -ne 600 ] && [ $file_permissions -ne 400 ]; then
-		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-site-opts.cnf in home directory."
+		abort 1 "Aborted. Insecure file permissons on file install-wp/conf/mysql-opts-site.cnf in home directory."
 	fi
 fi
 
 # Extract data from MySQL option file
-declare $(awk '
+declare $($awk_cmd '
 BEGIN { FS="=|#" }
 $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_user="$2; next }
 $1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_password="$2; next }
@@ -293,18 +300,33 @@ if [ $? -ne 0 ]; then
 	abort 1 "Aborted. Could not set grants for database user."
 fi
 
+# Get salts from https://api.wordpress.org/secret-key/1.1/salt/ and save them in a tmp tile
+printf "Downloading salts...\n"
+wp_salts_tmp_file="wp-salts-"$(date +%s%N)".txt"
+$curl_cmd -o "$user_home_tmp/$wp_salts_tmp_file" https://api.wordpress.org/secret-key/1.1/salt/ && chmod 600 "$user_home_tmp/$wp_salts_tmp_file"
+if [ $? -ne 0 ]; then
+	if [ -f "$user_home_tmp/$wp_salts_tmp_file" ]; then
+		rm "$user_home_tmp/$wp_salts_tmp_file"
+	fi
+	abort 1 "Aborted. Could not download salts."
+fi
+
 # Create wp-config.php with database information from MySQL option file for site
 printf "Creating wp-config.php...\n"
-awk '
-BEGIN{ OFS = "\047" }
-FNR == NR && $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); user = $2; next }
-FNR == NR && $1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); password = $2; next }
-FNR == NR && $1 == "database" { gsub(/^[ \t]+|[ \t]+$/, "", $2); database = $2; next }
-FNR != NR && /^define\(/ && /DB_NAME/ { $4 = database }
-FNR != NR && /^define\(/ && /DB_USER/ { $4 = user }
-FNR != NR && /^define\(/ && /DB_PASSWORD/ { $4 = password }
-FNR != NR' FS="=|#" "$mysql_site_opts_file" FS="\047" "$document_root/wp-config-sample.php" > "$document_root/wp-config.php"
+$awk_cmd '
+BEGIN{ OFS = "\047"; fname = ""; idx = 0 }
+fname != FILENAME { fname = FILENAME; idx++ }
+idx == 1 && $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); user = $2; next }
+idx == 1 && $1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); password = $2; next }
+idx == 1 && $1 == "database" { gsub(/^[ \t]+|[ \t]+$/, "", $2); database = $2; next }
+idx == 2 && /^define\(/ { salts[$2] = $4; next }
+idx == 3 && /^define\(/ && $2~/DB_NAME/ { $4 = database }
+idx == 3 && /^define\(/ && $2~/DB_USER/ { $4 = user }
+idx == 3 && /^define\(/ && $2~/DB_PASSWORD/ { $4 = password }
+idx == 3 && /^define\(/ && ($2 in salts) { $4 = salts[$2] }
+idx == 3' FS="=|#" "$mysql_site_opts_file" FS="\047" "$user_home_tmp/$wp_salts_tmp_file" FS="\047" "$document_root/wp-config-sample.php" > "$document_root/wp-config.php"
 if [ $? -ne 0 ]; then
+	rm "$user_home_tmp/$wp_salts_tmp_file"
 	abort 1 "Aborted. Could not create wp-config.php file."
 fi
 
@@ -362,7 +384,7 @@ server {
 }
 EOF
 
-	printf "$server_block_template" | awk -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
+	printf "$server_block_template" | $awk_cmd -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
 	/^\tserver_name/ && $2 == "DOMAIN;" && /;$/ { $2 = domain";"; print "\t"$0; next }
 	/^\troot/ && $2 == "DOCROOT;" && /;$/ { $2 = docroot";"; print "\t"$0; next }
 	/^\t\tfastcgi_pass/ && $2 == "unix:PHPFPMSOCK;" && /;$/ { $2 = "unix:"php_fpm_sock";"; print "\t\t"$0; next } 1' > "$vhost_config_dir/$domain"
@@ -377,6 +399,12 @@ EOF
 		$nginx_cmd -s reload
 	fi
 	
+fi
+
+# Clean up - delete tmp files
+printf "Cleaning up...\n"
+if [ -f "$user_home_tmp/$wp_salts_tmp_file" ]; then
+	rm "$user_home_tmp/$wp_salts_tmp_file"
 fi
 
 printf "${green}All done!${cf}\n"

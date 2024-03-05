@@ -1,4 +1,4 @@
 .vscode
 .tmp
-config/*
-!config/*-template.cnf
+conf/*
+!conf/*-template.cnf

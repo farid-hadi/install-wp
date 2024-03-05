@@ -1,0 +1,20 @@
+name: Check Pull Request to main
+run-name: Checking Pull Request to main branch
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+    branches:
+      - "main"
+jobs:
+  check-pull-request-to-main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking Pull Request
+        if: github.base_ref == 'main' && startsWith( github.head_ref, 'release/' ) != true
+        run: |
+          echo "ERROR: You can only merge to main branch from release branches."
+          exit 1
