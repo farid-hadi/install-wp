@@ -293,18 +293,33 @@ if [ $? -ne 0 ]; then
 	abort 1 "Aborted. Could not set grants for database user."
 fi
 
+# Get salts from https://api.wordpress.org/secret-key/1.1/salt/ and save them in a tmp tile
+printf "Downloading salts...\n"
+wp_salts_tmp_file="wp-salts-"$(date +%s%N)".txt"
+$curl_cmd -o "$user_home_tmp/$wp_salts_tmp_file" https://api.wordpress.org/secret-key/1.1/salt/ && chmod 600 "$user_home_tmp/$wp_salts_tmp_file"
+if [ $? -ne 0 ]; then
+	if [ -f "$user_home_tmp/$wp_salts_tmp_file" ]; then
+		rm "$user_home_tmp/$wp_salts_tmp_file"
+	fi
+	abort 1 "Aborted. Could not download salts."
+fi
+
 # Create wp-config.php with database information from MySQL option file for site
 printf "Creating wp-config.php...\n"
 awk '
-BEGIN{ OFS = "\047" }
-FNR == NR && $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); user = $2; next }
-FNR == NR && $1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); password = $2; next }
-FNR == NR && $1 == "database" { gsub(/^[ \t]+|[ \t]+$/, "", $2); database = $2; next }
-FNR != NR && /^define\(/ && /DB_NAME/ { $4 = database }
-FNR != NR && /^define\(/ && /DB_USER/ { $4 = user }
-FNR != NR && /^define\(/ && /DB_PASSWORD/ { $4 = password }
-FNR != NR' FS="=|#" "$mysql_site_opts_file" FS="\047" "$document_root/wp-config-sample.php" > "$document_root/wp-config.php"
+BEGIN{ OFS = "\047"; fname = ""; idx = 0 }
+fname != FILENAME { fname = FILENAME; idx++ }
+idx == 1 && $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); user = $2; next }
+idx == 1 && $1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); password = $2; next }
+idx == 1 && $1 == "database" { gsub(/^[ \t]+|[ \t]+$/, "", $2); database = $2; next }
+idx == 2 && /^define\(/ { salts[$2] = $4; next }
+idx == 3 && /^define\(/ && $2~/DB_NAME/ { $4 = database }
+idx == 3 && /^define\(/ && $2~/DB_USER/ { $4 = user }
+idx == 3 && /^define\(/ && $2~/DB_PASSWORD/ { $4 = password }
+idx == 3 && /^define\(/ && ($2 in salts) { $4 = salts[$2] }
+idx == 3' FS="=|#" "$mysql_site_opts_file" FS="\047" "$user_home_tmp/$wp_salts_tmp_file" FS="\047" "$document_root/wp-config-sample.php" > "$document_root/wp-config.php"
 if [ $? -ne 0 ]; then
+	rm "$user_home_tmp/$wp_salts_tmp_file"
 	abort 1 "Aborted. Could not create wp-config.php file."
 fi
 
@@ -377,6 +392,12 @@ EOF
 		$nginx_cmd -s reload
 	fi
 	
+fi
+
+# Clean up - delete tmp files
+printf "Cleaning up...\n"
+if [ -f "$user_home_tmp/$wp_salts_tmp_file" ]; then
+	rm "$user_home_tmp/$wp_salts_tmp_file"
 fi
 
 printf "${green}All done!${cf}\n"
