@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checking Pull Request
-        if: github.base_ref == 'main' && github.head_ref != 'develop'
+        if: github.base_ref == 'main' && startsWith( github.head_ref, 'release/' )
         run: |
-          echo "ERROR: You can only merge to main branch from develop."
+          echo "ERROR: You can only merge to main branch from release branches."
           exit 1
