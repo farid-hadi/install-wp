@@ -12,6 +12,8 @@ _install-wp is in no way affiliated with or endorsed by the WordPress Foundation
 
 `install-wp` requires a Linux-based environment with Nginx, MySQL or MariaDB and PHP(FPM) installed.
 
+Other requirements are CURL, Tar and AWK, which likely already are installed on your system.
+
 ## Configuration
 
 **Before running the script for the first time** you'll need to create two [_MySQL Option files_](https://dev.mysql.com/doc/refman/8.0/en/option-files.html#option-file-syntax) in your home directory.
