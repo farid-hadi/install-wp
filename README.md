@@ -32,7 +32,7 @@ chmod 600 ~/install-wp/conf/mysql-opts-site.cnf
 
 Next, use your preferred text editor and update the usernames, passwords and database name in your newly created files.
 
-`~/install-wp/conf/mysql-opts-admin.cnf` needs to contain a `[client]` section with a `user` and a `password`. This database user needs exist and needs to have the required privileges to be able to create databases, users and set grants.
+`~/install-wp/conf/mysql-opts-admin.cnf` needs to contain a `[client]` section with a `user` and a `password`. This needs to be an existing database user with privileges required to create databases, users and set grants.
 
 Example:
 
