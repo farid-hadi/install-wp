@@ -136,6 +136,11 @@ if [ -z "$tar_cmd" ]; then
 	abort 1 "Aborted. tar does not seem to be installed."
 fi
 
+awk_cmd=$(which awk)
+if [ -z "$awk_cmd" ]; then
+	abort 1 "Aborted. AWK does not seem to be installed."
+fi
+
 find_cmd=$(which find)
 if [ -z "$find_cmd" ]; then
 	abort 1 "Aborted. find does not seem to be installed."
@@ -168,7 +173,7 @@ if [ "$web_server" == "nginx" ]; then
 		abort 1 "Aborted. nginx does not seem to be installed."
 	else
 		# Get nginx user
-		declare $(ps -eo "%u,%c,%a" | grep nginx | awk '
+		declare $(ps -eo "%u,%c,%a" | grep nginx | $awk_cmd '
 		BEGIN { FS="," }
 		{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
 		{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
@@ -251,7 +256,7 @@ else
 fi
 
 # Extract data from MySQL option file
-declare $(awk '
+declare $($awk_cmd '
 BEGIN { FS="=|#" }
 $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_user="$2; next }
 $1 == "password" { gsub(/^[ \t]+|[ \t]+$/, "", $2); print "database_password="$2; next }
@@ -308,7 +313,7 @@ fi
 
 # Create wp-config.php with database information from MySQL option file for site
 printf "Creating wp-config.php...\n"
-awk '
+$awk_cmd '
 BEGIN{ OFS = "\047"; fname = ""; idx = 0 }
 fname != FILENAME { fname = FILENAME; idx++ }
 idx == 1 && $1 == "user" { gsub(/^[ \t]+|[ \t]+$/, "", $2); user = $2; next }
@@ -379,7 +384,7 @@ server {
 }
 EOF
 
-	printf "$server_block_template" | awk -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
+	printf "$server_block_template" | $awk_cmd -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
 	/^\tserver_name/ && $2 == "DOMAIN;" && /;$/ { $2 = domain";"; print "\t"$0; next }
 	/^\troot/ && $2 == "DOCROOT;" && /;$/ { $2 = docroot";"; print "\t"$0; next }
 	/^\t\tfastcgi_pass/ && $2 == "unix:PHPFPMSOCK;" && /;$/ { $2 = "unix:"php_fpm_sock";"; print "\t\t"$0; next } 1' > "$vhost_config_dir/$domain"
