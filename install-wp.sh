@@ -16,18 +16,18 @@ function printHelp() {
 	printVersion
 	printf "\n"
 	printf "Quickly install a new WordPress site in your development environment.\n"
-	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database with values extracted from the install-wp-[admin|site]-opts files, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.\n"
+	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database with values extracted from the MySQL Option files, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.\n"
 	printf "\n"
 	printf "Prior to running this script you need to create the below two 'MySQL Option files' with '[client] sections' in your home directory. "
-	printf "You can copy the files install-wp/config/install-wp-admin-opts-template.cnf and install-wp/config/install-wp-site-opts-template.cnf to create your option files.\n"
+	printf "You can copy the files install-wp/conf/mysql-opts-admin-template.cnf and install-wp/conf/mysql-opts-site-template.cnf to create your option files.\n"
 	printf "\n"
 	printf "IMPORTANT: Make sure you restrict access to your option files with e.g. chmod 600 so that unauthorized users can't see your database passwords!\n"
 	printf "\n"
 	printf "MySQL Option Files:\n"
-	printf "~/install-wp/config/install-wp-admin-opts\n"
-	printf "  Needs to contain username and password for the database user that can create new databases and grants.\n"
-	printf "~/install-wp/config/install-wp-site-opts\n"
-	printf "  Needs to contain username, password and database name for the new database and user to create for this site.\n"
+	printf "~/install-wp/conf/mysql-opts-admin.cnf\n"
+	printf "  Needs to contain username and password for an existing database user that can create new databases, users and grants.\n"
+	printf "~/install-wp/conf/mysql-opts-site.cnf\n"
+	printf "  Needs to contain username, password and database name for the new database and user that you wish to be created for this site.\n"
 	printf "\n"
 	printf "Usage: install-wp [options]\n"
 	printf "\n"
@@ -226,25 +226,25 @@ $tar_cmd xzf "$user_home_tmp/latest.tar.gz" -C "$document_root" --strip-componen
 
 # Read MySQL option files and get required information
 printf "Reading MySQL Option files...\n"
-mysql_admin_opts_file="$user_home/install-wp/config/install-wp-admin-opts.cnf"
-mysql_site_opts_file="$user_home/install-wp/config/install-wp-site-opts.cnf"
+mysql_admin_opts_file="$user_home/install-wp/conf/mysql-opts-admin.cnf"
+mysql_site_opts_file="$user_home/install-wp/conf/mysql-opts-site.cnf"
 
 if [ ! -f $mysql_admin_opts_file ]; then
-	abort 1 "Aborted. Could not find file install-wp/config/install-wp-admin-opts.cnf in home directory."
+	abort 1 "Aborted. Could not find file install-wp/conf/mysql-opts-admin.cnf in home directory."
 else
 	# Check file permissions to ensure user doesn't have insecure options file
 	file_permissions=$(stat -c %a $mysql_admin_opts_file)
 	if [ $file_permissions -ne 600 ] && [ $file_permissions -ne 400 ]; then
-		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-admin-opts.cnf in home directory."
+		abort 1 "Aborted. Insecure file permissons on file install-wp/conf/mysql-opts-admin.cnf in home directory."
 	fi
 fi
 if [ ! -f $mysql_site_opts_file ]; then
-  abort 1 "Aborted. Could not find file install-wp/config/install-wp-site-opts.cnf in home directory."
+  abort 1 "Aborted. Could not find file install-wp/conf/mysql-opts-site.cnf in home directory."
 else
 	# Check file permissions to ensure user doesn't have insecure options file
 	file_permissions=$(stat -c %a $mysql_site_opts_file)
 	if [ $file_permissions -ne 600 ] && [ $file_permissions -ne 400 ]; then
-		abort 1 "Aborted. Insecure file permissons on file install-wp/config/install-wp-site-opts.cnf in home directory."
+		abort 1 "Aborted. Insecure file permissons on file install-wp/conf/mysql-opts-site.cnf in home directory."
 	fi
 fi
 
