@@ -303,7 +303,7 @@ fi
 # Get salts from https://api.wordpress.org/secret-key/1.1/salt/ and save them in a tmp tile
 printf "Downloading salts...\n"
 wp_salts_tmp_file="wp-salts-"$(date +%s%N)".txt"
-$curl_cmd -o "$user_home_tmp/$wp_salts_tmp_file" https://api.wordpress.org/secret-key/1.1/salt/ && chmod 600 "$user_home_tmp/$wp_salts_tmp_file"
+$curl_cmd -sS -o "$user_home_tmp/$wp_salts_tmp_file" https://api.wordpress.org/secret-key/1.1/salt/ && chmod 600 "$user_home_tmp/$wp_salts_tmp_file"
 if [ $? -ne 0 ]; then
 	if [ -f "$user_home_tmp/$wp_salts_tmp_file" ]; then
 		rm "$user_home_tmp/$wp_salts_tmp_file"
