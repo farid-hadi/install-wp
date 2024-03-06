@@ -339,20 +339,27 @@ chmod -R 770 "$document_root"
 if [ "$web_server" == "nginx" ] && [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
 
 	printf "Creating Nginx server block...\n"
+
+	vhost_config_file="$domain"
 	
 	if [ -d "/etc/nginx/sites-available" ] && [ -d "/etc/nginx/sites-enabled" ]; then
 		vhost_config_dir="/etc/nginx/sites-available"
 	elif [ -d "/etc/nginx/vhosts.d" ]; then
 		vhost_config_dir="/etc/nginx/vhosts.d"
+		vhost_config_file="$domain.conf"
 	elif [ -d "/etc/nginx/conf.d" ]; then
 		vhost_config_dir="/etc/nginx/conf.d"
+		vhost_config_file="$domain.conf"
 	fi
 
 	if [ -z "$vhost_config_dir" ]; then
 		abort 1 "Aborted. Could not find location for server block configuration."
 	fi
 
-	php_fpm_sock=$($find_cmd /var/run/php/ -name "php*-fpm.sock" -type s -print -quit)
+	php_fpm_sock=$($find_cmd /var/run/php/ -name "php*-fpm.sock" -type s -print -quit 2>/dev/null)
+	if [ -z "$php_fpm_sock" ]; then
+		php_fpm_sock=$($find_cmd "/var/run/php-fpm/" -name "*.sock" -type s -print -quit 2>/dev/null)
+	fi
 
 	if [ -z "$php_fpm_sock" ]; then
 		abort 1 "Aborted. Could not find PHP FPM socket."
@@ -387,13 +394,13 @@ EOF
 	printf "$server_block_template" | $awk_cmd -v docroot="$document_root" -v domain="$domain" -v php_fpm_sock="$php_fpm_sock" '
 	/^\tserver_name/ && $2 == "DOMAIN;" && /;$/ { $2 = domain";"; print "\t"$0; next }
 	/^\troot/ && $2 == "DOCROOT;" && /;$/ { $2 = docroot";"; print "\t"$0; next }
-	/^\t\tfastcgi_pass/ && $2 == "unix:PHPFPMSOCK;" && /;$/ { $2 = "unix:"php_fpm_sock";"; print "\t\t"$0; next } 1' > "$vhost_config_dir/$domain"
+	/^\t\tfastcgi_pass/ && $2 == "unix:PHPFPMSOCK;" && /;$/ { $2 = "unix:"php_fpm_sock";"; print "\t\t"$0; next } 1' > "$vhost_config_dir/$vhost_config_file"
 	
 	if [ $? -ne 0 ]; then
 		abort 1 "Aborted. Could not create Nginx server block."
 	else
 		if [ "$vhost_config_dir" == "/etc/nginx/sites-available" ]; then
-			ln -s "$vhost_config_dir/$domain" /etc/nginx/sites-enabled
+			ln -s "$vhost_config_dir/$vhost_config_file" /etc/nginx/sites-enabled
 		fi
 		printf "Reloading Nginx...\n"
 		$nginx_cmd -s reload
