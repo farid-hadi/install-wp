@@ -19,7 +19,7 @@ Other requirements are CURL, Tar and AWK, which likely already are installed on 
 You can copy the files `install-wp/conf/mysql-opts-admin-template.cnf` and `install-wp/conf/mysql-opts-site-template.cnf` to create your option files.
 These files must be placed in `~/install-wp/conf/` and must be named `mysql-opts-admin.cnf` and `mysql-opts-site.cnf` respectively.
 
-**Important:** Make sure your restrict access to these files so that unauthorized users can't see your database passwords!
+**Important:** Make sure you restrict access to these files so that unauthorized users can't see your database passwords!
 
 Copy the MySQL option files and set the correct permissions:
 
