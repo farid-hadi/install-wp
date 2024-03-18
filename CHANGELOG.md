@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- added support for Apache web server
+
 ## [v0.2.1-alpha] - 2024-03-06
 
 ### Fixed
