@@ -68,7 +68,7 @@ sudo ./install-wp.sh -d your.domain.com -docroot /var/www/your.domain.com/public
 
 After running the above, simply visit _your.domain.com_ to run the usual WordPress installation.
 
-Example to install a new WordPress site _without creating a server block (virtual host)_, with a document root of _/var/www/your.domain.com/public_html_, served by an _Nginx_ web server.
+Example to install a new WordPress site _without creating a server block (virtual host)_, with a document root of _/var/www/wordpress/public_html_, served by an _Nginx_ web server.
 
 ```
 cd ~/install-wp/

@@ -65,6 +65,11 @@ while [ $# -gt 0 ]; do
 			shift
 			continue
 			;;
+		--apache|--apache2|--httpd)
+			web_server="apache2"
+			shift
+			continue
+			;;
 		*)
 			printf "${red}Error: Invalid arguments.${cf}\n"
 			printf "Use --help for help with usage.\n"
@@ -106,7 +111,12 @@ if [ -z "$document_root" ]; then
 fi
 
 if [ -z "$web_server" ]; then
-	read -e -p "Web server (nginx): " web_server
+	read -p "Web server (nginx|apache2|httpd): " web_server
+fi
+
+# Set $web_server to "apache2" if user entered apache or httpd
+if [ "$web_server" == "apache" ] || [ "$web_server" == "httpd" ]; then
+	web_server="apache2"
 fi
 
 # Abort if any required arguments are missing
@@ -116,7 +126,7 @@ fi
 if [ -z "$web_server" ]; then
 	abort 1 "Aborted. No web server supplied as argument."
 fi
-if [ "$web_server" != "nginx" ]; then
+if [ "$web_server" != "nginx" ] && [ "$web_server" != "apache2" ]; then
 	abort 1 "Aborted. Invalid value supplied for web server."
 fi
 
@@ -177,11 +187,36 @@ if [ "$web_server" == "nginx" ]; then
 		BEGIN { FS="," }
 		{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
 		{gsub(/^[ \t]+|[ \t]+$/, "", $3)}
-		/worker process/ { print "web_server_user="$1; exit }
+		$1 != "root" && $3~/worker process/ { print "web_server_user="$1; exit }
 		')
 
 		if [ -z "$web_server_user" ]; then
 			abort 1 "Aborted. Could not get nginx user."
+		fi
+	fi
+fi
+
+# If chosen web server is Apache, get command and user
+if [ "$web_server" == "apache2" ]; then
+	apache2_or_httpd="apache2"
+	apache_cmd=$(which apache2 2>/dev/null)
+	if [ -z "$apache_cmd" ]; then
+		apache2_or_httpd="httpd"
+		apache_cmd=$(which httpd 2>/dev/null)
+	fi
+	if [ -z "$apache_cmd" ]; then
+		abort 1 "Aborted. apache2 / httpd does not seem to be installed."
+	else
+		# Get apache user
+		declare $(ps -eo "%u,%c,%a" | grep $apache2_or_httpd | $awk_cmd -v apache2_or_httpd="$apache2_or_httpd" '
+		BEGIN { FS="," }
+		{gsub(/^[ \t]+|[ \t]+$/, "", $1)}
+		{gsub(/^[ \t]+|[ \t]+$/, "", $2)}
+		$1 != "root" && $2 == apache2_or_httpd { print "web_server_user="$1; exit }
+		')
+
+		if [ -z "$web_server_user" ]; then
+			abort 1 "Aborted. Could not get apache2 user."
 		fi
 	fi
 fi
@@ -276,27 +311,27 @@ fi
 
 # Create database and database user
 printf "Creating database...\n"
-$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "USE $database_name;" &> /dev/null;
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "USE $database_name;" &>/dev/null;
 if [ $? -eq 0 ]; then
 	abort 1 "Aborted. Database already exists."
 fi
 
-$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE DATABASE $database_name;" 1> /dev/null;
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE DATABASE $database_name;" 1>/dev/null;
 if [ $? -ne 0 ]; then
 	abort 1 "Aborted. Could not create database."
 fi
 
-$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE USER IF NOT EXISTS '$database_user'@'localhost' IDENTIFIED BY '$database_password';" 1> /dev/null;
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "CREATE USER IF NOT EXISTS '$database_user'@'localhost' IDENTIFIED BY '$database_password';" 1>/dev/null;
 if [ $? -ne 0 ]; then
 	# Since we couldn't create the user, let's delete the database we created
-	$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
+	$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1>/dev/null;
 	abort 1 "Aborted. Could not create database user."
 fi
 
-$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "GRANT ALL ON $database_name.* TO '$database_user'@'localhost';" 1> /dev/null;
+$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "GRANT ALL ON $database_name.* TO '$database_user'@'localhost';" 1>/dev/null;
 if [ $? -ne 0 ]; then
 	# Since we couldn't set the grants, let's delete the database we created
-	$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1> /dev/null;
+	$mysql_cmd --defaults-extra-file="$mysql_admin_opts_file" -e "DROP DATABASE $database_name;" 1>/dev/null;
 	abort 1 "Aborted. Could not set grants for database user."
 fi
 
@@ -335,7 +370,7 @@ printf "Setting file permissions...\n"
 chown -R $web_server_user:$web_server_user "$document_root"
 chmod -R 770 "$document_root"
 
-# Create Nginx server block for domain
+# Create Nginx server block for domain if web server is Nginx and domain is not none/localhost
 if [ "$web_server" == "nginx" ] && [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
 
 	printf "Creating Nginx server block...\n"
@@ -406,6 +441,66 @@ EOF
 		$nginx_cmd -s reload
 	fi
 	
+fi
+
+# Create Apache Virtual Host for domain if web server is Apache and domain is not none/localhost
+if [ "$web_server" == "apache2" ] && [ -n "$domain" ] && [ "$domain" != "localhost" ] && [ "$domain" != "none" ]; then
+
+	printf "Creating Apache virtual host...\n"
+
+	vhost_config_file="$domain.conf"
+	
+	if [ -d "/etc/apache2/sites-available" ] && [ -d "/etc/apache2/sites-enabled" ]; then
+		vhost_config_dir="/etc/apache2/sites-available"
+	elif [ -d "/etc/httpd/sites-available" ] && [ -d "/etc/httpd/sites-enabled" ]; then
+		vhost_config_dir="/etc/httpd/sites-available"
+	elif [ -d "/etc/httpd/conf.d" ]; then
+		vhost_config_dir="/etc/httpd/conf.d"
+	fi
+
+	if [ -z "$vhost_config_dir" ]; then
+		abort 1 "Aborted. Could not find location for virtual host configuration."
+	fi
+
+	read -r -d '' virtual_host_template <<"EOF"
+# Created by install-wp
+<VirtualHost *:80>
+	ServerName DOMAIN
+	DocumentRoot DOCROOT
+
+	DirectoryIndex index.php index.html
+
+	<Directory DOCROOT>
+		Options FollowSymLinks
+		AllowOverride All
+		Order allow,deny
+		Allow from all
+	</Directory>
+</VirtualHost>
+EOF
+
+	printf "$virtual_host_template" | $awk_cmd -v docroot="$document_root" -v domain="$domain" '
+	/^\tServerName/ && $2 == "DOMAIN" { $2 = domain; print "\t"$0; next }
+	/^\tDocumentRoot/ && $2 == "DOCROOT" { $2 = docroot; print "\t"$0; next }
+	/^\t<Directory/ && $2 == "DOCROOT>" { $2 = docroot">"; print "\t"$0; next } 1' > "$vhost_config_dir/$vhost_config_file"
+
+	if [ $? -ne 0 ]; then
+		abort 1 "Aborted. Could not create Apache virtual host."
+	else
+		if [ "$vhost_config_dir" == "/etc/apache2/sites-available" ]; then
+			ln -s "$vhost_config_dir/$vhost_config_file" /etc/apache2/sites-enabled
+		elif [ "$vhost_config_dir" == "/etc/httpd/sites-available" ]; then
+			ln -s "$vhost_config_dir/$vhost_config_file" /etc/httpd/sites-enabled
+		fi
+
+		printf "Restarting Apache...\n"
+		apachectl -k graceful &>/dev/null
+		if [ $? -ne 0 ]; then
+			systemctl restart httpd &>/dev/null
+		fi
+
+	fi
+
 fi
 
 # Clean up - delete tmp files
