@@ -4,13 +4,11 @@ A bash script to quickly install a WordPress site in your Linux-based developmen
 
 `install-wp` will download WordPress from WordPress.org, extract the files to your desired document root, create the database and database user with values extracted from _MySQL Option files_, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.
 
-**Note:** install-wp currently only supports Nginx. Support for Apache will be coming.
-
 _install-wp is in no way affiliated with or endorsed by the WordPress Foundation or the WordPress open source project._
 
 ## Requirements
 
-`install-wp` requires a Linux-based environment with Nginx, MySQL or MariaDB and PHP(FPM) installed.
+`install-wp` requires a Linux-based environment with Nginx or Apache web server, MySQL or MariaDB and PHP(FPM) installed.
 
 Other requirements are CURL, Tar and AWK, which likely already are installed on your system.
 
@@ -59,6 +57,8 @@ database=database_name
 
 **Note:** The script must be run with `sudo`.
 
+### Nginx
+
 Example to install a new WordPress site with the domain _your.domain.com_, with a document root of _/var/www/your.domain.com/public_html_, served by an _Nginx_ web server.
 
 ```
@@ -76,3 +76,23 @@ sudo ./install-wp.sh -docroot /var/www/wordpress/public_html --nginx
 ```
 
 The above will not create a server block but will set the correct file permissions so that Nginx can access and serve the files.
+
+### Apache
+
+Example to install a new WordPress site with the domain _your.domain.com_, with a document root of _/var/www/your.domain.com/public_html_, served by an _Apache_ web server.
+
+```
+cd ~/install-wp/
+sudo ./install-wp.sh -d your.domain.com -docroot /var/www/your.domain.com/public_html --apache2
+```
+
+After running the above, simply visit _your.domain.com_ to run the usual WordPress installation.
+
+Example to install a new WordPress site _without creating a virtual host_, with a document root of _/var/www/wordpress/public_html_, served by an _Apache_ web server.
+
+```
+cd ~/install-wp/
+sudo ./install-wp.sh -docroot /var/www/wordpress/public_html --apache2
+```
+
+The above will not create a server block but will set the correct file permissions so that Apache can access and serve the files.
