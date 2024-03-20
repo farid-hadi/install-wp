@@ -16,7 +16,7 @@ function printHelp() {
 	printVersion
 	printf "\n"
 	printf "Quickly install a new WordPress site in your development environment.\n"
-	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database and database user with values extracted from the MySQL Option files, create a wp-config.php file with the correct values and configure a server block / virtual host for the desired domain.\n"
+	printf "This script will download WordPress from WordPress.org, extract the files to your desired document root, create the database and database user with values extracted from the MySQL Option files, create a wp-config.php file with the correct values and configure a server block or virtual host for the desired domain.\n"
 	printf "\n"
 	printf "Prior to running this script you need to create the below two 'MySQL Option files' with '[client] sections' in your home directory. "
 	printf "You can copy the files install-wp/conf/mysql-opts-admin-template.cnf and install-wp/conf/mysql-opts-site-template.cnf to create your option files.\n"
@@ -39,6 +39,7 @@ function printHelp() {
 	printf "  -d, --domain                  Set domain name of the site you're creating.\n"
 	printf "  -docroot, --document-root     Set document root of the site you're creating. I.e. where to install the WordPress core files.\n"
 	printf "  --nginx                       Set your chosen web server to Nginx.\n"
+	printf "  --apache, --apache2, --httpd  Set your chosen web server to Apache.\n"
 	printf "\n"
 	printf "Please also see documentation at https://github.com/farid-hadi/install-wp\n"
 }
