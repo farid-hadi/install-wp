@@ -63,7 +63,7 @@ Example to install a new WordPress site with the domain _your.domain.com_, with 
 
 ```
 cd ~/install-wp/
-sudo ./install-wp.sh -d your.domain.com -docroot /var/www/your.domain.com/public_html --nginx
+sudo ./install-wp.sh -d your.domain.com --document-root /var/www/your.domain.com/public_html --nginx
 ```
 
 After running the above, simply visit _your.domain.com_ to run the usual WordPress installation.
@@ -72,18 +72,21 @@ Example to install a new WordPress site _without creating a server block (virtua
 
 ```
 cd ~/install-wp/
-sudo ./install-wp.sh -docroot /var/www/wordpress/public_html --nginx
+sudo ./install-wp.sh --document-root /var/www/wordpress/public_html --nginx
 ```
 
 The above will not create a server block but will set the correct file permissions so that Nginx can access and serve the files.
 
 ### Apache
 
+[!TIP]
+The examples below use the flag `--apache2` but you can also use `--apache` or `--httpd`, no matter which distro you are using, and the script will automatically try to find which version of Apache is running on your system.
+
 Example to install a new WordPress site with the domain _your.domain.com_, with a document root of _/var/www/your.domain.com/public_html_, served by an _Apache_ web server.
 
 ```
 cd ~/install-wp/
-sudo ./install-wp.sh -d your.domain.com -docroot /var/www/your.domain.com/public_html --apache2
+sudo ./install-wp.sh -d your.domain.com --document-root /var/www/your.domain.com/public_html --apache2
 ```
 
 After running the above, simply visit _your.domain.com_ to run the usual WordPress installation.
@@ -92,7 +95,7 @@ Example to install a new WordPress site _without creating a virtual host_, with 
 
 ```
 cd ~/install-wp/
-sudo ./install-wp.sh -docroot /var/www/wordpress/public_html --apache2
+sudo ./install-wp.sh --document-root /var/www/wordpress/public_html --apache2
 ```
 
-The above will not create a server block but will set the correct file permissions so that Apache can access and serve the files.
+The above will not create a virtual host but will set the correct file permissions so that Apache can access and serve the files.
