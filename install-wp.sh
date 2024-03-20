@@ -4,7 +4,7 @@
 # Bash script that downloads and installs WordPress at the specified location, with the specified domain and database.
 # https://github.com/farid-hadi/install-wp
 
-version="0.2.1-alpha"
+version="0.2.2-beta"
 
 # Print version function
 function printVersion() {
